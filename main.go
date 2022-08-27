@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/xuri/excelize/v2"
 	_ "image/gif"
@@ -12,12 +11,41 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 var TotalPage int
 var offset = 2
+var mutex = sync.Mutex{}
 
 func crawler(page int, f *excelize.File) {
+
+	doc := getDoc(page)
+	// 测试一下 html 是否完整，否则重试
+	a := doc.Find("._1rGJJd-K0-f7qJoR9CzyeL ._1sC8pER1GUhouLkB66Mb0I").Nodes
+	l := len(a)
+	// 失败最多重试十次
+	for i := 0; i < 10 && l == 0; i++ {
+		doc = getDoc(page)
+		a = doc.Find("._1rGJJd-K0-f7qJoR9CzyeL ._1sC8pER1GUhouLkB66Mb0I").Nodes
+		l = len(a)
+	}
+
+	if l == 0 {
+		log.Printf("页面 %d 获取失败", page)
+		return
+	}
+
+	// 设置总页数
+	if TotalPage == 0 {
+		b := a[l-1].Attr[1].Val
+		b = strings.TrimLeft(b, "/blog/page/")
+		TotalPage, _ = strconv.Atoi(b)
+	}
+	parse(doc, f)
+}
+
+func getDoc(page int) *goquery.Document {
 	res, err := http.Get("https://www.aquanliang.com/blog/page/" + strconv.Itoa(page))
 	if err != nil {
 		log.Fatal(err)
@@ -37,13 +65,7 @@ func crawler(page int, f *excelize.File) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// 总页数
-	if page == 1 {
-		a := doc.Find("._1rGJJd-K0-f7qJoR9CzyeL ._1sC8pER1GUhouLkB66Mb0I").Nodes[6].Attr[1].Val
-		a = strings.TrimLeft(a, "/blog/page/")
-		TotalPage, _ = strconv.Atoi(a)
-	}
-	parse(doc, f)
+	return doc
 }
 
 func parse(doc *goquery.Document, f *excelize.File) {
@@ -54,22 +76,22 @@ func parse(doc *goquery.Document, f *excelize.File) {
 		img := s.Find("a").Find("._1wTUfLBA77F7m-CM6YysS6").Find("._2ahG-zumH-g0nsl6xhsF0s").
 			Find("noscript").Nodes[0].FirstChild.Data
 		img = trimImg(img)
-		fmt.Println(img)
+		//log.Println(img)
 
 		// 标题
 		s = s.Find("._3HG1uUQ3C2HBEsGwDWY-zw")
 		title := s.Find("._3_JaaUmGUCjKZIdiLhqtfr").Text()
-		fmt.Println(title)
+		//log.Println(title)
 
 		// 日期
 		date := s.Find("._3TzAhzBA-XQQruZs-bwWjE").Nodes[0].LastChild.Data
-		fmt.Println(date)
+		//log.Println(date)
 
 		// 访问量
 		view := s.Find("._2gvAnxa4Xc7IT14d5w8MI1").Nodes[0].LastChild.Data
-		fmt.Println(view)
+		//log.Println(view)
 
-		importExcel(offset, title, date, view, img, f)
+		insertExcel(offset, title, date, view, img, f)
 		offset++
 	})
 
@@ -81,7 +103,7 @@ func trimImg(img string) string {
 	return img
 }
 
-func importExcel(i int, title string, date string, view string, img string, f *excelize.File) {
+func insertExcel(i int, title string, date string, view string, img string, f *excelize.File) {
 	index := strconv.Itoa(i)
 	a := "A" + index
 	b := "B" + index
@@ -132,10 +154,10 @@ func main() {
 	// 输入到 excel
 	f := initExcel()
 	crawler(1, f)
-	for i := 2; i <= TotalPage; i++ {
+	for i := 2; i <= 59; i++ {
 		crawler(i, f)
 	}
 	if err := f.SaveAs("Data.xlsx"); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 }
