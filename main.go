@@ -14,18 +14,14 @@ import (
 	"strings"
 )
 
-func ExampleScrape() {
-	// 首先获取总页数
-	// 遍历每页的总文章
-	// 输入到 excel
+var TotalPage int
+var offset = 2
 
-	// Request the HTML page.
-	res, err := http.Get("https://www.aquanliang.com/blog/page/1")
+func Crawler(page int, f *excelize.File) {
+	res, err := http.Get("https://www.aquanliang.com/blog/page/" + strconv.Itoa(page))
 	if err != nil {
 		log.Fatal(err)
 	}
-	//b, err := ioutil.ReadAll(res.Body)
-	//fmt.Printf("%s", b)
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
@@ -41,12 +37,16 @@ func ExampleScrape() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// 总页数
+	if page == 1 {
+		a := doc.Find("._1rGJJd-K0-f7qJoR9CzyeL ._1sC8pER1GUhouLkB66Mb0I").Nodes[6].Attr[1].Val
+		a = strings.TrimLeft(a, "/blog/page/")
+		TotalPage, _ = strconv.Atoi(a)
+	}
+	Crawl(doc, f)
+}
 
-	f := excelize.NewFile()
-	f.SetCellValue("Sheet1", "A1", "标题")
-	f.SetCellValue("Sheet1", "B1", "日期")
-	f.SetCellValue("Sheet1", "C1", "访问量")
-	f.SetCellValue("Sheet1", "D1", "图片")
+func Crawl(doc *goquery.Document, f *excelize.File) {
 
 	// 查找
 	doc.Find("._1ySUUwWwmubujD8B44ZDzy span ._3gcd_TVhABEQqCcXHsrIpT").Each(func(i int, s *goquery.Selection) {
@@ -69,12 +69,10 @@ func ExampleScrape() {
 		view := s.Find("._2gvAnxa4Xc7IT14d5w8MI1").Nodes[0].LastChild.Data
 		fmt.Println(view)
 
-		importExcel(i, title, date, view, img, f)
+		importExcel(offset, title, date, view, img, f)
+		offset++
 	})
 
-	if err := f.SaveAs("Book1.xlsx"); err != nil {
-		fmt.Println(err)
-	}
 }
 
 func trimImg(img string) string {
@@ -84,7 +82,7 @@ func trimImg(img string) string {
 }
 
 func importExcel(i int, title string, date string, view string, img string, f *excelize.File) {
-	index := strconv.Itoa(i + 2)
+	index := strconv.Itoa(i)
 	a := "A" + index
 	b := "B" + index
 	c := "C" + index
@@ -96,5 +94,19 @@ func importExcel(i int, title string, date string, view string, img string, f *e
 }
 
 func main() {
-	ExampleScrape()
+	// 首先获取总页数
+	// 遍历每页的总文章
+	// 输入到 excel
+	f := excelize.NewFile()
+	f.SetCellValue("Sheet1", "A1", "标题")
+	f.SetCellValue("Sheet1", "B1", "日期")
+	f.SetCellValue("Sheet1", "C1", "访问量")
+	f.SetCellValue("Sheet1", "D1", "图片")
+	Crawler(1, f)
+	for i := 2; i <= TotalPage; i++ {
+		Crawler(i, f)
+	}
+	if err := f.SaveAs("Book1.xlsx"); err != nil {
+		fmt.Println(err)
+	}
 }
