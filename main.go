@@ -3,6 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/xuri/excelize/v2"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
 	"net/http"
@@ -64,6 +68,44 @@ func trimImg(img string) string {
 	img = strings.TrimLeft(img, "<img src=\"")
 	img = strings.TrimRight(img, "\" decoding=\"async\" style=\"position:absolute;top:0;left:0;bottom:0;right:0;box-sizing:border-box;padding:0;border:none;margin:auto;display:block;width:0;height:0;min-width:100%;max-width:100%;min-height:100%;max-height:100%;object-fit:cover\"/>")
 	return img
+}
+
+func importExcel() {
+
+	f, err := excelize.OpenFile("Book1.xlsx")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer func() {
+		// Close the spreadsheet.
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	// Insert a picture.
+	if err := f.AddPicture("Sheet1", "A2", "image.png", ""); err != nil {
+		fmt.Println(err)
+	}
+	// Insert a picture to worksheet with scaling.
+	if err := f.AddPicture("Sheet1", "D2", "image.jpg",
+		`{"x_scale": 0.5, "y_scale": 0.5}`); err != nil {
+		fmt.Println(err)
+	}
+	// Insert a picture offset in the cell with printing support.
+	if err := f.AddPicture("Sheet1", "H2", "image.gif", `{
+        "x_offset": 15,
+        "y_offset": 10,
+        "print_obj": true,
+        "lock_aspect_ratio": false,
+        "locked": false
+    }`); err != nil {
+		fmt.Println(err)
+	}
+	// Save the spreadsheet with the origin path.
+	if err = f.Save(); err != nil {
+		fmt.Println(err)
+	}
 }
 
 func main() {
