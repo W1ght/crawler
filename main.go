@@ -17,7 +17,7 @@ import (
 var TotalPage int
 var offset = 2
 
-func Crawler(page int, f *excelize.File) {
+func crawler(page int, f *excelize.File) {
 	res, err := http.Get("https://www.aquanliang.com/blog/page/" + strconv.Itoa(page))
 	if err != nil {
 		log.Fatal(err)
@@ -43,10 +43,10 @@ func Crawler(page int, f *excelize.File) {
 		a = strings.TrimLeft(a, "/blog/page/")
 		TotalPage, _ = strconv.Atoi(a)
 	}
-	Crawl(doc, f)
+	parse(doc, f)
 }
 
-func Crawl(doc *goquery.Document, f *excelize.File) {
+func parse(doc *goquery.Document, f *excelize.File) {
 
 	// 查找
 	doc.Find("._1ySUUwWwmubujD8B44ZDzy span ._3gcd_TVhABEQqCcXHsrIpT").Each(func(i int, s *goquery.Selection) {
@@ -87,26 +87,55 @@ func importExcel(i int, title string, date string, view string, img string, f *e
 	b := "B" + index
 	c := "C" + index
 	d := "D" + index
-	f.SetCellValue("Sheet1", a, title)
-	f.SetCellValue("Sheet1", b, date)
-	f.SetCellValue("Sheet1", c, view)
-	f.SetCellValue("Sheet1", d, img)
+	err := f.SetCellValue("Sheet1", a, title)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = f.SetCellValue("Sheet1", b, date)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = f.SetCellValue("Sheet1", c, view)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = f.SetCellValue("Sheet1", d, img)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func initExcel() *excelize.File {
+	f := excelize.NewFile()
+	err := f.SetCellValue("Sheet1", "A1", "标题")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = f.SetCellValue("Sheet1", "B1", "日期")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = f.SetCellValue("Sheet1", "C1", "访问量")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = f.SetCellValue("Sheet1", "D1", "图片")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return f
 }
 
 func main() {
 	// 首先获取总页数
 	// 遍历每页的总文章
 	// 输入到 excel
-	f := excelize.NewFile()
-	f.SetCellValue("Sheet1", "A1", "标题")
-	f.SetCellValue("Sheet1", "B1", "日期")
-	f.SetCellValue("Sheet1", "C1", "访问量")
-	f.SetCellValue("Sheet1", "D1", "图片")
-	Crawler(1, f)
+	f := initExcel()
+	crawler(1, f)
 	for i := 2; i <= TotalPage; i++ {
-		Crawler(i, f)
+		crawler(i, f)
 	}
-	if err := f.SaveAs("Book1.xlsx"); err != nil {
+	if err := f.SaveAs("Data.xlsx"); err != nil {
 		fmt.Println(err)
 	}
 }
