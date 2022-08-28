@@ -11,12 +11,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
+	"time"
 )
 
 var TotalPage int
 var offset = 2
-var mutex = sync.Mutex{}
+var falseSet []int
 
 func crawler(page int, f *excelize.File) {
 
@@ -24,8 +24,10 @@ func crawler(page int, f *excelize.File) {
 	// 测试一下 html 是否完整，否则重试
 	a := doc.Find("._1rGJJd-K0-f7qJoR9CzyeL ._1sC8pER1GUhouLkB66Mb0I").Nodes
 	l := len(a)
-	// 失败最多重试十次
-	for i := 0; i < 10 && l == 0; i++ {
+	// 失败最多重试5次
+	for i := 0; i < 5 && l == 0; i++ {
+		// 等待3秒再进行请求，以防qps过高对请求进行拦截
+		time.Sleep(3 * time.Second)
 		doc = getDoc(page)
 		a = doc.Find("._1rGJJd-K0-f7qJoR9CzyeL ._1sC8pER1GUhouLkB66Mb0I").Nodes
 		l = len(a)
@@ -33,6 +35,7 @@ func crawler(page int, f *excelize.File) {
 
 	if l == 0 {
 		log.Printf("页面 %d 获取失败", page)
+		falseSet = append(falseSet, page)
 		return
 	}
 
@@ -154,8 +157,14 @@ func main() {
 	// 输入到 excel
 	f := initExcel()
 	crawler(1, f)
-	for i := 2; i <= 59; i++ {
+	for i := 2; i <= TotalPage; i++ {
+		if TotalPage%40 == 0 {
+			time.Sleep(20 * time.Second)
+		}
 		crawler(i, f)
+	}
+	for _, v := range falseSet {
+		crawler(v, f)
 	}
 	if err := f.SaveAs("Data.xlsx"); err != nil {
 		log.Println(err)
